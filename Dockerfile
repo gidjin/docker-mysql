@@ -1,32 +1,28 @@
-FROM phusion/passenger-customizable:0.9.14
+FROM mysql:5.5
 MAINTAINER John Gedeon <js1@gedeons.com>
 
-# Set correct environment variables.
-ENV HOME /root
+# let debian know we are not interactive
+ENV DEBIAN_FRONTEND=noninteractive
 
-# install basics
-RUN /build/utilities.sh
+# Install some packages
+RUN apt-get update && apt-get -y install ruby && \
+    gem install daemons faraday
 
-CMD ["/sbin/my_init"]
+# setup root
+USER root
+ENV HOME=/root
+WORKDIR /root
 
-# Install Mysql
-RUN apt-get update && apt-get -yq install mysql-server-5.6 pwgen
+# add utilities
+COPY bin/* /usr/local/bin/
+RUN chmod 755 /usr/local/bin/*
+COPY lib/* /root/
 
-# port
-EXPOSE 3306
+# Clean up temp files
+RUN apt-get clean &&\
+    rm -rf /tmp/* /var/tmp/* &&\
+    rm -rf /var/lib/apt/lists/* &&\
+    rm -f /etc/dpkg/dpkg.cfg.d/02apt-speedup
 
-# Add MySQL configuration
-COPY my.cnf /etc/mysql/conf.d/my.cnf
-COPY mysqld_charset.cnf /etc/mysql/conf.d/mysqld_charset.cnf
-
-# Add basics
-COPY bootstrap.sh /etc/my_init.d/bootstrap.sh
-RUN chmod 755 /etc/my_init.d/bootstrap.sh
-
-# Clean up apt
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN chown -R mysql:mysql /var/lib/mysql
-
-# Add VOLUMEs to allow backup of config and databases
-VOLUME  ["/etc/mysql", "/var/lib/mysql"]
+ENTRYPOINT ["/usr/local/bin/init.sh"]
+CMD ["mysqld"]
